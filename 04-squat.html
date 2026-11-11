@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))</script>
+<meta name="apple-mobile-web-app-title" content="Squat">
+<meta name="theme-color" content="#F3F1EC" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0C0F0E" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Robot status, drills and how Squat reacts.">
+<title>Squat Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Rubik:wght@400;500;600;700&display=swap">
+<style>/* ---------- Squat app v3: flat, editorial sports app ---------- */
+:root{
+  --bg:#FFFFFF; --band:#EFEFEC; --chrome:#E4E4E0; --surface:#FFFFFF; --surface-2:#F4F4F1; --sunken:#EBEBE7;
+  --ink:#121314; --ink-2:#5A5E60; --ink-3:#8C9092; --line:rgba(18,19,20,.09); --line-2:rgba(18,19,20,.16);
+  --brand:#D2302A;                       /* court-line red: the one brand colour */
+  --court:#D2302A;
+  --racket:#1E9E5A; --racket-soft:rgba(30,158,90,.12);
+  --straight:#C8661A; --straight-soft:rgba(200,102,26,.12);
+  --cross:#2F6BDB; --cross-soft:rgba(47,107,219,.11);
+  --body:#8A8F91; --warn:#B7791F; --bad:#D2302A; --good:#1E9E5A;
+  --glass:rgba(255,255,255,.86); --shadow:none; --cam-bg:#0B0C0C;
+  --cond:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif-condensed,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D0D0E; --band:#000000; --chrome:#000; --surface:#0D0D0E; --surface-2:#1A1A1C; --sunken:#202023;
+  --ink:#F1F1EF; --ink-2:#A5A8A9; --ink-3:#727678; --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
+  --brand:#F0453C; --court:#E0473E; --racket:#2DB06C; --racket-soft:rgba(45,176,108,.15);
+  --straight:#D9772F; --straight-soft:rgba(217,119,47,.16); --cross:#4F86EE; --cross-soft:rgba(79,134,238,.15);
+  --body:#8E9395; --warn:#D49A3A; --bad:#F0453C; --good:#2DB06C; --glass:rgba(13,13,14,.86); color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0D0D0E; --band:#000000; --chrome:#000; --surface:#0D0D0E; --surface-2:#1A1A1C; --sunken:#202023;
+  --ink:#F1F1EF; --ink-2:#A5A8A9; --ink-3:#727678; --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.14);
+  --brand:#F0453C; --court:#E0473E; --racket:#2DB06C; --racket-soft:rgba(45,176,108,.15);
+  --straight:#D9772F; --straight-soft:rgba(217,119,47,.16); --cross:#4F86EE; --cross-soft:rgba(79,134,238,.15);
+  --body:#8E9395; --warn:#D49A3A; --bad:#F0453C; --good:#2DB06C; --glass:rgba(13,13,14,.86); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--chrome);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--chrome);color:var(--ink);
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+.app{max-width:440px;margin:0 auto;min-height:100vh;min-height:100dvh;background:var(--bg);position:relative;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+@media (min-width:600px){.app{box-shadow:0 0 0 1px var(--line)}}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tnum,.num{font-variant-numeric:tabular-nums}
+.cond{font-family:var(--cond)}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+h1,h2,h3{margin:0;text-wrap:balance}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+
+/* ---------- header ---------- */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;height:48px;
+  background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(16px);backdrop-filter:saturate(1.4) blur(16px);border-bottom:.5px solid var(--line-2)}
+.wordmark{display:flex;align-items:center;gap:7px;font:700 21px/1 var(--cond);letter-spacing:1.4px;text-transform:uppercase}
+.wordmark svg{flex:none}
+.topbar .ctx{font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.live{display:inline-flex;align-items:center;gap:6px;font:600 14px/1 var(--cond);letter-spacing:1px;text-transform:uppercase;color:var(--brand)}
+.live i{width:8px;height:8px;border-radius:4px;background:var(--brand);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;color:var(--ink)}
+.iconbtn svg{width:21px;height:21px}
+.ptitle{padding-top:14px;padding-bottom:12px}
+.ptitle h1{font:700 40px/0.95 var(--cond);text-transform:uppercase;letter-spacing:.3px}
+.ptitle .sub{font-size:14px;color:var(--ink-2);margin-top:6px}
+
+/* ---------- tab bar ---------- */
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;z-index:40;
+  display:grid;grid-template-columns:repeat(5,1fr);padding:6px max(6px,env(safe-area-inset-left,0px)) calc(4px + env(safe-area-inset-bottom,0px));
+  background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(18px);backdrop-filter:saturate(1.4) blur(18px);border-top:.5px solid var(--line-2)}
+.tabbar a{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;font-weight:500;color:var(--ink-3);padding:3px 0}
+.tabbar a svg{width:25px;height:25px}
+.tabbar a[aria-current="page"]{color:var(--ink)}
+.tabbar a[aria-current="page"] svg{color:var(--brand)}
+
+/* ---------- sections: flat blocks separated by bands ---------- */
+.block{border-top:8px solid var(--band);padding-top:16px;padding-bottom:18px}
+.block.tight{padding-bottom:6px}
+.bh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.bh h2{font:600 22px/1.05 var(--cond);text-transform:uppercase;letter-spacing:.4px}
+.bh a,.bh button{font-size:14px;color:var(--brand);font-weight:500}
+.muted{color:var(--ink-2)} .faint{color:var(--ink-3)}
+.foot{font-size:13px;color:var(--ink-3);line-height:1.4}
+.hair{height:.5px;background:var(--line-2);margin:12px 0}
+
+/* stat strip with vertical dividers */
+.stats{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+.stats>div{padding:2px 12px;border-left:.5px solid var(--line-2);min-width:0}
+.stats>div:first-child{border-left:0;padding-left:0}
+.stats b{display:block;font:600 34px/1 var(--cond);letter-spacing:.2px;font-variant-numeric:tabular-nums}
+.stats b small{font-size:17px;font-weight:500;color:var(--ink-2);margin-left:2px}
+.stats span{display:block;font-size:12.5px;color:var(--ink-2);margin-top:4px;line-height:1.25}
+
+/* key-value rows */
+.kv{display:flex;flex-direction:column}
+.kv>div{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:11px 0;border-top:.5px solid var(--line-2)}
+.kv>div:first-child{border-top:0;padding-top:2px}
+.kv dt,.kv .k{color:var(--ink-2);font-size:15px;flex:none}
+.kv dd,.kv .v{margin:0;font-size:15px;font-weight:600;text-align:right;min-width:0}
+
+/* lists */
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;min-height:52px;border-top:.5px solid var(--line-2)}
+.row:first-child{border-top:0}
+.row .grow{flex:1;min-width:0}
+.row .t1{font-size:16px;font-weight:500}
+.row .t2{font-size:13.5px;color:var(--ink-2);margin-top:1px}
+.chev{width:7px;height:12px;color:var(--ink-3);flex:none}
+
+/* underline tabs and segmented control */
+.utabs{display:flex;gap:20px;border-bottom:.5px solid var(--line-2);overflow-x:auto;scrollbar-width:none}
+.utabs::-webkit-scrollbar{display:none}
+.utabs button{flex:none;padding:10px 0 9px;font-size:15px;font-weight:500;color:var(--ink-3);border-bottom:2px solid transparent;margin-bottom:-.5px;white-space:nowrap}
+.utabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--brand)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--sunken);border-radius:9px;padding:2px;gap:2px}
+.seg button{height:32px;border-radius:7px;font-size:13.5px;font-weight:500;color:var(--ink-2);white-space:nowrap;padding:0 6px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+/* direction text + swatches */
+.dir-s{color:var(--straight)} .dir-x{color:var(--cross)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:0}
+.sw.s{background:var(--straight)} .sw.x{background:var(--cross)} .sw.r{background:var(--racket)} .sw.b{background:var(--body)}
+.tag{font:600 13px/1 var(--cond);letter-spacing:.8px;text-transform:uppercase;color:var(--ink-3)}
+
+/* buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;height:50px;border-radius:10px;background:var(--brand);color:#fff;
+  font:600 19px/1 var(--cond);letter-spacing:1px;text-transform:uppercase;width:100%}
+.btn.ghost{background:var(--surface-2);color:var(--ink)}
+.btn:active,.seg button:active,.iconbtn:active{opacity:.7}
+
+/* video */
+.vid{position:relative;background:var(--cam-bg);aspect-ratio:1/1;width:100%;overflow:hidden}
+.vid video{display:block;width:100%;height:100%;object-fit:cover}
+.vtag{position:absolute;font:600 13px/1 var(--cond);letter-spacing:1px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.5);padding:6px 8px 5px;border-radius:4px}
+.vtag.tl{left:10px;top:10px}.vtag.tr{right:10px;top:10px}.vtag.bl{left:10px;bottom:10px;font-size:15px}.vtag.hit{background:var(--brand)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--ink-2);padding-top:8px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{display:block;width:14px;height:3px;border-radius:2px}
+
+/* tooltip */
+.tip{position:absolute;pointer-events:none;z-index:15;background:var(--ink);color:var(--bg);font-size:12px;line-height:1.35;padding:6px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,calc(-100% - 10px));opacity:0;transition:opacity .12s}
+.tip.on{opacity:1}
+svg text{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- v4: friendlier layer (rounded tiles, softer type). The Lab overrides this back. ---------- */
+:root{--round:"Rubik",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--tile:#F4F3EF}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--tile:#1A1A1C}}
+:root[data-theme="dark"]{--tile:#1A1A1C}
+.ptitle h1{font:700 32px/1.05 var(--round);text-transform:none;letter-spacing:-.3px}
+.ptitle .sub{font-size:15px}
+.wordmark{font-family:var(--round);font-weight:700;font-size:19px;letter-spacing:.2px;text-transform:none}
+.block{border-top:0;background:var(--tile);border-radius:22px;margin:12px max(12px,env(safe-area-inset-left,0px)) 0;
+  padding:16px 16px 18px!important}
+.block.plain{background:none;padding-left:4px!important;padding-right:4px!important}
+.bh h2{font:600 19px/1.15 var(--round);text-transform:none;letter-spacing:-.1px}
+.stats{gap:8px}
+.stats>div{border-left:0;padding:12px 12px 11px!important;background:var(--surface);border-radius:16px}
+.stats b{font:700 28px/1 var(--round);letter-spacing:-.4px}
+.stats b small{font-size:15px}
+.kv>div{border-top-color:var(--line)}
+.vid{width:auto;margin:0 max(12px,env(safe-area-inset-left,0px));border-radius:22px}
+.vtag{font:600 12px/1 var(--round);letter-spacing:.2px;text-transform:none;border-radius:999px;padding:7px 10px}
+.vtag.bl{font-size:14px}
+.btn{border-radius:999px;font:600 17px/1 var(--round);letter-spacing:0;text-transform:none}
+.utabs{gap:8px;border-bottom:0}
+.utabs button{padding:0 14px;height:34px;border-radius:999px;border:0;background:var(--surface);font-size:14.5px;color:var(--ink-2);margin:0}
+.utabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.tag{font:600 12px/1 var(--round);letter-spacing:.3px;text-transform:none}
+.pillx,.pills{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:13.5px;font-weight:600}
+.pillx{background:var(--cross-soft);color:var(--cross)} .pills{background:var(--straight-soft);color:var(--straight)}
+.legend{padding-left:max(16px,env(safe-area-inset-left,0px))}
+.tabbar a[aria-current="page"]{color:var(--brand)}
+
+.live{font:600 13px/1 var(--round);letter-spacing:.2px;text-transform:none}
+</style>
+<script>/* ---------- shared Squat app helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pct = p => Math.round(p * 100) + '%';
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function h(tag, attrs = {}, html = '') { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); e.innerHTML = html; return e; }
+
+const ICON = {
+  live: '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="21" height="16" rx="3"/><path d="M14 6v16M3.5 15.5h21" opacity=".55"/><circle cx="19" cy="11" r="1.8" fill="currentColor" stroke="none"/></svg>',
+  replay: '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="17.5" cy="9.5" rx="5" ry="6" transform="rotate(35 17.5 9.5)"/><path d="M14.3 14.2 6 23.5"/><path d="M4 8.5a10 10 0 0 1 4-4" opacity=".55"/></svg>',
+  report: '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 23V12M11 23V6M17 23v-8M23 23V9"/></svg>',
+  squat: '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="18" height="10" rx="3"/><circle cx="10.5" cy="14" r="1.8"/><circle cx="17.5" cy="14" r="1.8"/><path d="M7 19v3M21 19v3M14 9V5.5"/><circle cx="14" cy="4.5" r="1" fill="currentColor"/></svg>',
+  progress: '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l6-6 4 4 9-9"/><path d="M17 9h6v6"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l6 6-6 6"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
+  dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  back: '<svg viewBox="0 0 12 20" width="12" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2 2 10l8 8"/></svg>',
+};
+const TABS = [['01-play.html', 'Play', 'live'], ['02-swings.html', 'Swings', 'swings'], ['03-feedback.html', 'Feedback', 'feedback'], ['04-squat.html', 'Squat', 'squat'], ['05-lab.html', 'Lab', 'lab']];
+ICON.swings = '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="21" height="17" rx="3.5"/><path d="M12 10.5v7l6-3.5z" fill="currentColor"/></svg>';
+ICON.feedback = '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5h18a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H12l-5 4v-4H5A1.5 1.5 0 0 1 3.5 18V8A1.5 1.5 0 0 1 5 6.5z"/><path d="M9 13l2.5 2.5L17 10"/></svg>';
+ICON.lab = '<svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4h6M12 4v7l-6.5 10.5A1.6 1.6 0 0 0 6.9 24h14.2a1.6 1.6 0 0 0 1.4-2.5L16 11V4"/><path d="M8.5 17.5h11"/></svg>';
+/* inline mp4 (base64) -> blob URL; falls back to a published file next to the page */
+function videoSrc(video, b64, file) {
+  try { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    video.src = URL.createObjectURL(new Blob([u], { type: 'video/mp4' })); } catch (e) { video.src = file; }
+  video.addEventListener('error', () => { if (file && !video.src.endsWith(file)) video.src = file; }, { once: true });
+}
+function mountChrome(active) {
+  const nav = h('nav', { class: 'tabbar', 'aria-label': 'Tabs' });
+  TABS.forEach(([href, name, ic], i) => { const a = h('a', { href }, ICON[ic] + '<span>' + name + '</span>'); if (i === active) a.setAttribute('aria-current', 'page'); nav.appendChild(a); });
+  $('.app').appendChild(nav);
+  const tb = $('.topbar'); if (tb) { const f = () => tb.classList.toggle('scrolled', scrollY > 40); addEventListener('scroll', f, { passive: true }); f(); }
+}
+function segmented(root, onChange) {
+  const bs = $$('button', root);
+  bs.forEach(b => b.addEventListener('click', () => { bs.forEach(x => x.setAttribute('aria-pressed', x === b)); onChange && onChange(b.dataset.v, b); }));
+}
+const COLS = () => ({ brand: css('--brand'), s: css('--straight'), x: css('--cross'), r: css('--racket'), b: css('--body'), ink: css('--ink'), ink2: css('--ink-2'), ink3: css('--ink-3'), line: css('--line-2'), court: css('--court'), surface: css('--surface'), bg: css('--bg') });
+const onTheme = fn => { const m = matchMedia('(prefers-color-scheme: dark)'); m.addEventListener && m.addEventListener('change', fn); new MutationObserver(fn).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); };
+
+/* Read lock-in: earliest lead (ms before contact) from which the racket read was right and stayed right */
+const LEADS = [133, 67, 33, 17, 0];
+function lockIn(s, conf = 0.5) {
+  const want = s.label === 'crosscourt'; let lock = null;
+  for (const L of LEADS) { const p = s.pL[String(L)]; if (p == null) continue; const ok = want ? p > conf : p < 1 - conf; if (ok) { if (lock === null) lock = L; } else lock = null; }
+  return lock; // null = never read correctly
+}
+
+/* ---------- tiny 3D court renderer (metres; x across, y up, z from front wall) ---------- */
+const COURT = { W: 6.4, L: 9.75, short: 5.44, box: 1.6, out: 4.57, back: 2.13, svc: 1.78, tin: 0.48 };
+function View3D(canvas, opt = {}) {
+  const v = { az: opt.az ?? 0.35, el: opt.el ?? 0.32, r: opt.r ?? 6.2, tgt: opt.tgt || [3.2, 0.9, 5.2], f: 1.25, eye: null };
+  const ctx = canvas.getContext('2d');
+  v.resize = () => { const d = devicePixelRatio || 1, w = canvas.clientWidth, hh = canvas.clientHeight; canvas.width = w * d; canvas.height = hh * d; ctx.setTransform(d, 0, 0, d, 0, 0); v.W = w; v.H = hh; };
+  v.basis = () => {
+    let e = v.eye || [v.tgt[0] + v.r * Math.cos(v.el) * Math.sin(v.az), v.tgt[1] + v.r * Math.sin(v.el), v.tgt[2] + v.r * Math.cos(v.el) * Math.cos(v.az)];
+    const fw = norm(sub(v.tgt, e)), rt = norm(cross(fw, [0, 1, 0])), up = cross(rt, fw); v._b = { e, fw, rt, up };
+  };
+  v.p = P => { const { e, fw, rt, up } = v._b, d = sub(P, e), z = dot(d, fw); if (z < 0.1) return null; const s = v.f * Math.min(v.W, v.H * 1.1) / z; return [v.W / 2 + dot(d, rt) * s, v.H / 2 - dot(d, up) * s, z]; };
+  const NEAR = 0.12, depth = P => dot(sub(P, v._b.e), v._b.fw);
+  const cut = (A, B) => { const da = depth(A), db = depth(B), t = (NEAR - da) / (db - da); return add(A, mul(sub(B, A), t)); };
+  v.line = (pts, style, w = 1, dash) => {   // segments clipped at the near plane
+    ctx.beginPath();
+    for (let i = 1; i < pts.length; i++) {
+      let A = pts[i - 1], B = pts[i]; const da = depth(A), db = depth(B);
+      if (da < NEAR && db < NEAR) continue; if (da < NEAR) A = cut(A, B); if (db < NEAR) B = cut(A, B);
+      const a = v.p(A), b = v.p(B); if (!a || !b) continue; ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+    ctx.strokeStyle = style; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+  };
+  v.poly = (pts, fill) => {   // Sutherland-Hodgman clip against the near plane
+    const out = [];
+    pts.forEach((P, i) => { const Q = pts[(i + 1) % pts.length], dp = depth(P), dq = depth(Q);
+      if (dp >= NEAR) out.push(P); if ((dp >= NEAR) !== (dq >= NEAR)) out.push(cut(P, Q)); });
+    const q = out.map(v.p).filter(Boolean); if (q.length < 3) return;
+    ctx.beginPath(); q.forEach((x, i) => i ? ctx.lineTo(x[0], x[1]) : ctx.moveTo(x[0], x[1])); ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  };
+  v.clear = () => { ctx.clearRect(0, 0, v.W, v.H); v.basis(); };
+  v.court = (C) => {
+    const { W, L, short, box, out, back, svc, tin } = COURT, line = C.court, faint = C.line;
+    v.poly([[0, 0, 0], [W, 0, 0], [W, 0, L], [0, 0, L]], C.floor);
+    v.poly([[0, 0, 0], [W, 0, 0], [W, out, 0], [0, out, 0]], C.wall);
+    v.poly([[0, 0, 0], [0, out, 0], [0, back, L], [0, 0, L]], C.wall2); v.poly([[W, 0, 0], [W, out, 0], [W, back, L], [W, 0, L]], C.wall2);
+    v.line([[0, 0, short], [W, 0, short]], line, 1.6); v.line([[W / 2, 0, short], [W / 2, 0, L]], line, 1.6);
+    v.line([[box, 0, short], [box, 0, short + box], [0, 0, short + box]], line, 1.6); v.line([[W - box, 0, short], [W - box, 0, short + box], [W, 0, short + box]], line, 1.6);
+    v.line([[0, out, 0], [W, out, 0]], line, 1.4); v.line([[0, svc, 0], [W, svc, 0]], line, 1.2); v.line([[0, tin, 0], [W, tin, 0]], line, 1.2);
+    v.line([[0, out, 0], [0, back, L]], line, 1.2); v.line([[W, out, 0], [W, back, L]], line, 1.2);
+    v.line([[0, 0, 0], [W, 0, 0], [W, 0, L], [0, 0, L], [0, 0, 0]], faint, 1); v.line([[0, 0, 0], [0, out, 0]], faint, 1); v.line([[W, 0, 0], [W, out, 0]], faint, 1);
+  };
+  v.ctx = ctx; v.resize(); v.basis(); return v;
+}
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = a => { const n = Math.hypot(...a) || 1; return [a[0] / n, a[1] / n, a[2] / n]; };
+const BONES = [[5, 7], [7, 9], [6, 8], [8, 10], [5, 6], [11, 12], [5, 11], [6, 12], [11, 13], [13, 15], [12, 14], [14, 16], [0, 5], [0, 6]];
+function orbit(canvas, v, redraw) {
+  let p = null;
+  canvas.addEventListener('pointerdown', e => {
+    if (v.eye) { const d = sub(v.eye, v.tgt); v.r = Math.hypot(...d); v.el = Math.asin(d[1] / v.r); v.az = Math.atan2(d[0], d[2]); v.eye = null; }
+    p = [e.clientX, e.clientY, v.az, v.el]; canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => { if (!p) return; v.az = p[2] - (e.clientX - p[0]) * 0.008; v.el = clamp(p[3] + (e.clientY - p[1]) * 0.006, 0.04, 1.45); redraw(); });
+  const up = () => p = null; canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+}
+</script>
+</head><body><style>
+.dev{display:grid;grid-template-columns:104px minmax(0,1fr);gap:18px;align-items:center}
+.dev svg{width:100%;display:block}
+.dev .name{font-size:20px;font-weight:700}
+.dev .meta{font-size:13px;color:var(--ink-2);margin-top:2px}
+.tele{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px}
+.tele div{font-size:13px;color:var(--ink-2);line-height:1.25}
+.tele b{display:block;font-size:16px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.batt{display:inline-block;width:22px;height:11px;border:1.5px solid currentColor;border-radius:3px;position:relative;vertical-align:-1px;margin-right:4px}
+.batt i{position:absolute;left:1.5px;top:1.5px;bottom:1.5px;border-radius:1px;background:var(--good)}
+.batt::after{content:"";position:absolute;right:-4px;top:2.5px;width:2px;height:4px;border-radius:0 1px 1px 0;background:currentColor}
+.drillcard .desc{font-size:15px;color:var(--ink-2);margin:12px 0 6px;line-height:1.4;min-height:42px}
+#pattern{width:100%;display:block;margin-top:6px}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:.5px solid var(--line-2)}
+.opt .k{font-size:15.5px}
+.opt .k small{display:block;font-size:13px;color:var(--ink-2)}
+.stepper{display:flex;align-items:center;background:var(--sunken);border-radius:9px;height:32px;flex:none}
+.stepper button{width:40px;height:32px;font-size:20px;font-weight:500;color:var(--ink)}
+.stepper span{min-width:52px;text-align:center;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.opt .seg{min-width:170px}
+.toggle{width:51px;height:31px;border-radius:16px;background:var(--sunken);position:relative;flex:none;transition:background .2s}
+.toggle::after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:14px;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s}
+.toggle[aria-checked="true"]{background:var(--good)}
+.toggle[aria-checked="true"]::after{transform:translateX(20px)}
+.ant .big{display:flex;align-items:baseline;gap:10px;margin-top:10px}
+.ant .big b{font-size:44px;font-weight:700;letter-spacing:-1px;line-height:1}
+.ant .big span{font-size:15px;color:var(--ink-2)}
+.gauge{height:10px;border-radius:5px;background:var(--sunken);position:relative;margin:12px 0 4px}
+.gauge i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--racket);transition:width .3s}
+.gauge em{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink-3);left:0}
+.gk{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);font-weight:600}
+.leads{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:14px}
+.leads button{height:46px;border-radius:12px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.leads button small{font-size:10.5px;font-weight:600;color:var(--ink-3)}
+.leads button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.leads button[aria-pressed="true"] small{color:color-mix(in srgb,var(--bg) 70%,transparent)}
+.antnote{font-size:15px;line-height:1.4;margin-top:12px}
+.dpad{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,54px);gap:4px;justify-content:center}
+.dpad button{border-radius:16px;background:var(--surface);display:grid;place-items:center;color:var(--ink)}
+.dpad button svg{width:22px;height:22px}
+.dpad .c{background:var(--brand);color:#fff;font:600 15px/1 var(--round)}
+.drive{display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px;align-items:center}
+.drive .side{display:flex;flex-direction:column;gap:8px}
+.drive .side button{height:42px;border-radius:999px;background:var(--surface);font-size:14px;font-weight:500;padding:0 12px;text-align:left}
+.start{position:sticky;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:5;padding-top:8px;padding-bottom:8px}
+
+.react .row{cursor:pointer}
+.react{background:var(--surface);border-radius:16px;padding:0 14px}
+.kv{flex:1}
+.radio{width:22px;height:22px;border-radius:11px;border:2px solid var(--line-2);flex:none;position:relative}
+.react .row[aria-pressed="true"] .radio{border-color:var(--brand)}
+.react .row[aria-pressed="true"] .radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--brand)}
+.acc{text-align:right;flex:none}.acc b{display:block;font:600 22px/1 var(--round);letter-spacing:-.3px}.acc span{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
+</style>
+
+<div class="app">
+  <header class="topbar wrap">
+    <span class="wordmark"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1.5 6h15M9 6v10.5" style="stroke:var(--brand)" stroke-width="3" stroke-linecap="square"/></svg>Squat</span>
+    <span class="ctx"><i class="sw" style="background:var(--good);border-radius:4px;width:8px;height:8px"></i>Connected</span>
+  </header>
+  <div class="wrap ptitle">
+    <h1>Squat</h1>
+    <div class="sub">SRB-1 · Court 2 · on Squat-AP Wi-Fi</div>
+  </div>
+
+  <div class="wrap block" style="margin-top:4px">
+    <div class="dev">
+      <svg viewBox="0 0 116 100" id="robot" aria-label="Squat robot"></svg>
+      <div class="kv">
+        <div><span class="k">Battery</span><span class="v tnum"><span class="batt"><i style="width:72%"></i></span>78%</span></div>
+        <div><span class="k">Cameras</span><span class="v">2 × 120 fps</span></div>
+        <div><span class="k">Court map</span><span class="v">5/5 markers</span></div>
+        <div><span class="k">Jetson</span><span class="v tnum">54 °C</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap block drillcard">
+    <div class="bh"><h2>Drill</h2></div>
+    <div class="utabs" id="drill"><button data-v="drive" aria-pressed="true">Drives</button><button data-v="fig8" aria-pressed="false">Figure-8</button><button data-v="boast" aria-pressed="false">Boast-drive</button><button data-v="ghost" aria-pressed="false">Ghosting</button></div>
+    <div class="desc" id="desc"></div>
+    <svg id="pattern" viewBox="-6 -9 252 112"></svg>
+    <div class="opt"><span class="k">Wall</span><div class="seg" id="wall"><button data-v="L" aria-pressed="false">Left</button><button data-v="R" aria-pressed="true">Right</button><button data-v="B" aria-pressed="false">Both</button></div></div>
+    <div class="opt"><span class="k">Feeds</span><div class="stepper"><button data-d="-5" data-k="n" aria-label="Fewer">−</button><span id="v_n">50</span><button data-d="5" data-k="n" aria-label="More">+</button></div></div>
+    <div class="opt"><span class="k">Time between feeds</span><div class="stepper"><button data-d="-0.5" data-k="pace" aria-label="Faster">−</button><span id="v_pace">3.0 s</span><button data-d="0.5" data-k="pace" aria-label="Slower">+</button></div></div>
+    <div class="opt"><span class="k">Record every swing</span><button class="toggle" role="switch" aria-checked="true" aria-label="Record every swing"></button></div>
+  </div>
+
+  <div class="wrap block">
+    <div class="bh"><h2>When Squat moves</h2></div>
+    <div class="list react" id="react"></div>
+    <p class="foot" style="margin:8px 2px 0">Earlier means Squat gets there sooner, but guesses wrong more often.</p>
+  </div>
+
+  <div class="wrap block">
+    <div class="bh"><h2>Drive</h2></div>
+    <div class="drive">
+      <div class="dpad" id="dpad">
+        <span></span><button aria-label="Forward"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button><span></span>
+        <button aria-label="Strafe left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><button class="c" aria-label="Stop">Stop</button><button aria-label="Strafe right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <span></span><button aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button><span></span>
+      </div>
+      <div class="side"><button>Return to T</button><button>Park at back wall</button><button>Re-check markers</button></div>
+    </div>
+  </div>
+
+  <div class="wrap start"><button class="btn" id="go">Start drive drill</button></div>
+</div>
+
+<script>
+const D = {"meta":{"auc":{"body (3D skeleton v2)":[0.899,0.756],"racket NEW (IK track)":[0.951,0.914],"racket NEW contact only":[0.941,0.875],"racket NEW face only":[0.851,0.897],"racket NEW path only":[0.923,0.875],"racket OLD (rk10 contact pose)":[0.769,0.628],"body + racket NEW":[0.932,0.843],"body + racket OLD":[0.91,0.758]},"acc":{"racket_0":[[0.892,111],[0.92,75]],"racket_17":[[0.807,109],[0.836,73]],"racket_33":[[0.776,107],[0.789,71]],"racket_67":[[0.752,105],[0.797,69]],"racket_133":[[0.798,109],[0.849,73]],"pB":[[0.874,111],[0.893,75]],"pC":[[0.91,111],[0.92,75]],"bacc_0":[0.877,0.811],"bacc_17":[0.779,0.668],"bacc_33":[0.769,0.689],"bacc_67":[0.719,0.6],"bacc_133":[0.779,0.723],"bacc_pB":[0.863,0.747]},"body_lead":{"0":[0.89,0.765],"67":[0.872,0.722],"133":[0.896,0.748],"200":[0.896,0.727],"267":[0.894,0.733]},"auc17":[0.879,0.851],"auc33":[0.845,0.643],"auc67":[0.787,0.669],"auc133":[0.814,0.759]}};
+mountChrome(3);
+const M = D.meta, st = { drill: 'drive', wall: 'R', n: 50, pace: 3, src: 'racket', lead: 0 };
+const DRILLS = {
+  drive: ['Drives', 'Squat feeds deep along one wall. You drive straight or crosscourt; Squat reads your racket and chases.'],
+  fig8: ['Figure-8', 'Squat feeds to the middle of the court. You hit alternate crosscourt drives that cross at the front wall.'],
+  boast: ['Boast-drive', 'Squat boasts from the back corner; you drive it back deep. Trains the move from front to back.'],
+  ghost: ['Ghosting', 'No ball. Squat points to a corner, you move and shadow-swing, it times your return to the T.'],
+};
+function robot() {
+  const g = $('#robot'), c = COLS(); g.innerHTML = '';
+  el('rect', { x: 18, y: 26, width: 80, height: 48, rx: 10, fill: c.ink, opacity: .92 }, g);
+  [[10, 22], [94, 22], [10, 62], [94, 62]].forEach(([x, y]) => { el('rect', { x, y, width: 12, height: 18, rx: 4, fill: c.ink2 }, g); for (let k = 0; k < 4; k++) el('line', { x1: x + 2, x2: x + 10, y1: y + 3 + k * 4, y2: y + 6 + k * 4, stroke: c.surface, 'stroke-width': 1, opacity: .6 }, g); });
+  el('rect', { x: 30, y: 34, width: 56, height: 14, rx: 7, fill: c.surface, opacity: .12 }, g);
+  [40, 76].forEach(x => { el('circle', { cx: x, cy: 41, r: 6, fill: '#0B0D0C', stroke: c.brand, 'stroke-width': 2 }, g); el('circle', { cx: x + 1.5, cy: 39.5, r: 1.6, fill: '#fff', opacity: .8 }, g); });
+  el('line', { x1: 40, x2: 76, y1: 56, y2: 56, stroke: c.brand, 'stroke-width': 1, 'stroke-dasharray': '2 2' }, g);
+  const t = el('text', { x: 58, y: 66, 'font-size': 7, 'text-anchor': 'middle', fill: c.surface, 'font-weight': 700, opacity: .8 }, g); t.textContent = '52.5 cm';
+  el('path', { d: 'M58 26V12', stroke: c.ink2, 'stroke-width': 2 }, g); el('circle', { cx: 58, cy: 10, r: 3, fill: c.brand }, g);
+}
+function pattern() {
+  const g = $('#pattern'), c = COLS(); g.innerHTML = '';
+  // court drawn sideways: front wall on the left, x = depth (0..9.75 m), y = width (0..6.4 m)
+  const k = 240 / 9.75, X = z => z * k, Y = x => x * (96 / 6.4), H = 96;
+  el('rect', { x: 0, y: 0, width: 240, height: H, rx: 3, fill: c.bg, stroke: c.line }, g);
+  el('rect', { x: -4, y: 0, width: 4, height: H, fill: c.court }, g);
+  const ln = { stroke: c.court, 'stroke-width': .8, fill: 'none', opacity: .7 };
+  el('line', { x1: X(5.44), x2: X(5.44), y1: 0, y2: H, ...ln }, g); el('line', { x1: X(5.44), x2: 240, y1: H / 2, y2: H / 2, ...ln }, g);
+  el('path', { d: `M${X(5.44)} ${Y(1.6)}H${X(7.04)}V0M${X(5.44)} ${Y(4.8)}H${X(7.04)}V${H}`, ...ln }, g);
+  const R = st.wall === 'L' ? 1.2 : 5.2, opp = 6.4 - R, robot = [8.7, st.wall === 'B' ? 3.2 : R], you = [5.6, 3.2];
+  const arrow = (a, b, col, dash) => { el('path', { d: `M${X(a[0])} ${Y(a[1])}Q${X((a[0] + b[0]) / 2 - 1)} ${Y((a[1] + b[1]) / 2)} ${X(b[0])} ${Y(b[1])}`, fill: 'none', stroke: col, 'stroke-width': 2, 'stroke-dasharray': dash || '', 'stroke-linecap': 'round' }, g); el('circle', { cx: X(b[0]), cy: Y(b[1]), r: 3, fill: col }, g); };
+  const walls = st.wall === 'B' ? [1.2, 5.2] : [R];
+  if (st.drill === 'drive') walls.forEach(w => { arrow(robot, [7.0, w], c.ink3, '3 3'); arrow([6.6, w], [0.2, w], c.s); arrow([6.6, w], [0.2, 6.4 - w + (w > 3.2 ? 0.6 : -0.6)], c.x); });
+  if (st.drill === 'fig8') { arrow(robot, [5.2, 3.2], c.ink3, '3 3'); arrow([5.0, 4.6], [0.2, 1.8], c.x); arrow([5.0, 1.8], [0.2, 4.6], c.x); }
+  if (st.drill === 'boast') walls.forEach(w => { arrow([9.0, 6.4 - w], [0.3, w > 3.2 ? 0.4 : 6.0], c.ink3, '3 3'); arrow([1.8, w], [0.2, w], c.s); });
+  if (st.drill === 'ghost') [[1.2, 1.0], [1.2, 5.4], [8.6, 1.0], [8.6, 5.4]].forEach(p => arrow([5.44, 3.2], p, c.brand, '2 3'));
+  el('circle', { cx: X(you[0]), cy: Y(you[1]), r: 5, fill: c.ink }, g);
+  const ty = el('text', { x: X(you[0]), y: Y(you[1]) - 8, 'font-size': 8, 'text-anchor': 'middle', fill: c.ink2, 'font-weight': 700 }, g); ty.textContent = 'You';
+  el('rect', { x: X(robot[0]) - 6, y: Y(robot[1]) - 5, width: 12, height: 10, rx: 3, fill: c.brand }, g);
+  const tr = el('text', { x: X(robot[0]), y: Y(robot[1]) + (robot[1] > 3.2 ? -8 : 15), 'font-size': 8, 'text-anchor': 'middle', fill: c.brand, 'font-weight': 700 }, g); tr.textContent = 'Squat';
+  const fw = el('text', { x: 4, y: -2, 'font-size': 7, fill: c.ink3, 'font-weight': 600, 'letter-spacing': .4 }, g); fw.textContent = 'FRONT WALL';
+  $('#desc').textContent = DRILLS[st.drill][1]; $('#go').textContent = 'Start ' + DRILLS[st.drill][0].toLowerCase() + ' drill';
+  if (st.drill === 'ghost') $('#go').textContent = 'Start ghosting';
+}
+segmented($('#drill'), v => { st.drill = v; pattern(); });
+segmented($('#wall'), v => { st.wall = v; pattern(); });
+$$('.stepper button').forEach(b => b.onclick = () => {
+  const k = b.dataset.k; st[k] = clamp(+(st[k] + +b.dataset.d).toFixed(1), k === 'n' ? 10 : 1.5, k === 'n' ? 200 : 8);
+  $('#v_' + k).textContent = k === 'pace' ? st.pace.toFixed(1) + ' s' : st[k];
+});
+$$('.toggle').forEach(t => t.onclick = () => t.setAttribute('aria-checked', t.getAttribute('aria-checked') !== 'true'));
+// reaction modes, with real accuracies from the session
+const A = M.acc, MODES = [
+  ['wait', 'At the hit', 'Waits for contact', A.racket_0[0][0]],
+  ['early', '17 ms early', 'Reads your racket 2 frames before contact', A.racket_17[0][0]],
+  ['earlier', '33 ms early', 'Reads your racket 4 frames before contact', A.racket_33[0][0]],
+];
+MODES.forEach(([k, t1, t2, acc], i) => {
+  const r = h('button', { class: 'row', 'data-v': k, 'aria-pressed': i === 0, style: 'width:100%;text-align:left' },
+    `<span class="radio"></span><div class="grow"><div class="t1">${t1}</div><div class="t2">${t2}</div></div><div class="acc"><b class="rnd tnum">${Math.round(acc * 100)}%</b><span>right</span></div>`);
+  $('#react').appendChild(r);
+});
+segmented($('#react'));
+robot(); pattern();
+onTheme(() => { robot(); pattern(); });
+</script>
+<script>$$("[data-icon]").forEach(e=>{const k=e.dataset.icon;e.outerHTML=ICON[k]||""})</script></body></html>
